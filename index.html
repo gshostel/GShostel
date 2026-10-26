@@ -1250,7 +1250,7 @@
             .room-image-wrap img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
             
             .subroom-list { margin-top: 10px; background: #f8fafb; border-radius: 8px; padding: 10px; }
-            .subroom-item { font-size: 13px; display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed #e1e8ed; }
+            .subroom-item { color: #111827; font-size: 13px; display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed #e1e8ed; }
             .subroom-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
             .badge-free { color: #27ae60; font-weight: bold; }
             .badge-full { color: #e74c3c; font-weight: bold; }
@@ -1282,7 +1282,7 @@
 
         <div class="booking-section-header">
             <h2 class="booking-section-title">Выбор и бронирование номеров</h2>
-            <p class="booking-section-subtitle">Если вы хотите забронировать все места (независимо от пола), обязательно свяжитесь с нами по ватсапу или по телефону. Наш WhatsApp и номер телефона хостела вы найдёте в самом начале вкладки "Главная"</p>
+            <p class="booking-section-subtitle">Свободные места в режиме реального времени</p>
         </div>
 
         <!-- Панель даты и мест -->
@@ -1471,7 +1471,7 @@ const defaultHostelData = {
     "male": { 
         title: "Мужской номер", 
         price: 6000, 
-        type: "Место", 
+        type: "bed", 
         maxCapacity: 24,
         img: "https://i.ibb.co.com/Xnyyncb/IMG-7745.avif",
         rooms: [
@@ -1483,7 +1483,7 @@ const defaultHostelData = {
     "female": { 
         title: "Женский номер", 
         price: 6000, 
-        type: "Место", 
+        type: "bed", 
         maxCapacity: 24,
         img: "https://i.ibb.co.com/jks5cqDp/IMG-8401.png",
         rooms: [
@@ -1514,6 +1514,12 @@ const defaultHostelData = {
 
     function saveHostelData(data) {
         localStorage.setItem('gs_hostel_rooms', JSON.stringify(data));
+        if (typeof window.syncRoomsToFirebase === 'function') {
+            return window.syncRoomsToFirebase(data).catch(error => {
+                console.error('Firebase rooms sync error:', error);
+            });
+        }
+        return Promise.resolve();
     }
 
     function checkAndReleaseBookings() {
@@ -1683,7 +1689,7 @@ const defaultHostelData = {
                 btnText = 'Номер забронирован';
             }
 
-            let priceLabel = cat.type === 'room' ? `${cat.price.toLocaleString()} ₸ / номер` : `${cat.price.toLocaleString()} ₸ / койка`;
+            let priceLabel = cat.type === 'room' ? `${cat.price.toLocaleString()} ₸ / номер` : `${cat.price.toLocaleString()} ₸ / место`;
 
             grid.innerHTML += `
                 <div class="room-card ${(!isGenderAllowed || !isCapacityAllowed) ? 'disabled-card' : ''}">
@@ -1812,16 +1818,18 @@ const defaultHostelData = {
         const checkinDateTime = `${checkinDate}T${checkinTime}:00`;
         const checkoutDateTime = `${checkoutDate}T${checkoutTime}:00`;
         const activeBookings = JSON.parse(localStorage.getItem('gs_active_bookings') || '[]');
+        const bookingsForFirebase = [];
 
         allocation.forEach(a => {
             let targetRoom = cat.rooms.find(r => r.id === a.roomId);
             if (targetRoom) {
                 targetRoom.free -= a.count;
 
-                activeBookings.push({
+                const booking = {
                     bookingId: bookingId,
                     catKey: selectedCatKey,
                     roomId: a.roomId,
+                    roomName: a.roomName,
                     guestsCount: a.count,
                     checkinDate: checkinDate,
                     checkinTime: checkinTime,
@@ -1831,12 +1839,25 @@ const defaultHostelData = {
                     guestName: `${name} [${guestCategoryTitle}] (${genderText})`,
                     guestPhone: phone,
                     guestEmail: email
-                });
+                };
+                activeBookings.push(booking);
+                bookingsForFirebase.push(booking);
             }
         });
 
-        saveHostelData(data);
+        await saveHostelData(data);
         localStorage.setItem('gs_active_bookings', JSON.stringify(activeBookings));
+
+        if (typeof window.sendBookingToFirebase === 'function') {
+            try {
+                for (const booking of bookingsForFirebase) {
+                    booking.fbKey = await window.sendBookingToFirebase(booking);
+                }
+                localStorage.setItem('gs_active_bookings', JSON.stringify(activeBookings));
+            } catch (error) {
+                console.error('Firebase booking sync error:', error);
+            }
+        }
 
         let roomsStr = cat.type === 'room' ? `Весь номер (${currentGuests} чел.)` : allocation.map(a => `${a.roomName} (${a.count} чел.)`).join(', ');
         const roomIds = allocation.map(a => `${a.roomId} (${a.count})`).join(', ');
@@ -2065,7 +2086,7 @@ const defaultHostelData = {
     <!-- Подключение Firebase Realtime Database -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getDatabase, ref, onValue, set, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, onValue, set, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDeGgiX48dBFurvnNKh24p_0vglPkEz1fk",
@@ -2078,7 +2099,7 @@ const defaultHostelData = {
     databaseURL: "https://gshostel-2774c-default-rtdb.firebaseio.com"
   };
 
-  const app = initializeApp(firebaseConfig);
+    const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
   // Слушаем изменения цен и свободного места из админки
@@ -2086,99 +2107,26 @@ const defaultHostelData = {
     const data = snapshot.val();
     if (data) {
       localStorage.setItem('gs_hostel_rooms', JSON.stringify(data));
-      if (typeof renderRooms === 'function') renderRooms();
+            if (typeof updateGuestsDropdown === 'function') updateGuestsDropdown();
+            if (typeof renderClientRooms === 'function') renderClientRooms();
     }
   });
 
-  // Функция для отправки новой брони с сайта в базу
+    window.syncRoomsToFirebase = function(roomsData) {
+        return set(ref(db, 'rooms'), roomsData);
+    };
+
   window.sendBookingToFirebase = function(bookingData) {
     const newBookingRef = push(ref(db, 'bookings'));
-    return set(newBookingRef, {
+        return set(newBookingRef, {
       ...bookingData,
       createdAt: new Date().toISOString()
-    });
+        }).then(() => newBookingRef.key);
   };
-  // 1. Собираем данные из ваших полей на сайте (поменяйте ID полей на ваши, если они отличаются)
-const bookingData = {
-    guestName: document.getElementById('guest-name').value,       // Имя гостя
-    guestPhone: document.getElementById('guest-phone').value,     // Телефон
-    roomId: document.getElementById('room-select').value,         // ID комнаты (например, 'm_1', 'f_1', 'vip_1')
-    roomName: "Мужская комната №1",                               // Название комнаты
-    guestsCount: parseInt(document.getElementById('guests-count').value) || 1, // Кол-во мест
-    checkinDate: document.getElementById('checkin-date').value,   // Дата заезда
-    checkoutDateTime: document.getElementById('checkout-date').value + 'T12:00' // Дата/время выезда
-};
-
-// 2. Вставляем вот этот вызов отправки в Firebase:
-if (typeof window.makeBookingInFirebase === 'function') {
-    const success = await window.makeBookingInFirebase(bookingData);
-    if (success) {
-        alert("Бронирование успешно оформлено!");
-    }
-}
+    window.removeBookingFromFirebase = function(fbKey) {
+        return remove(ref(db, 'bookings/' + fbKey));
+    };
 </script>
-
-    <!-- Подключение Firebase для отправки данных с любого телефона -->
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-      import { getDatabase, ref, push, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-      const firebaseConfig = {
-        apiKey: "AIzaSyDeGgiX48dBFurvnNKh24p_0vglPkEz1fk",
-        authDomain: "gshostel-2774c.firebaseapp.com",
-        projectId: "gshostel-2774c",
-        storageBucket: "gshostel-2774c.firebasestorage.app",
-        messagingSenderId: "2821546272",
-        appId: "1:2821546272:web:36f595cc9490195f487745",
-        measurementId: "G-11GN6NF2DK",
-        databaseURL: "https://gshostel-2774c-default-rtdb.firebaseio.com"
-      };
-
-      const app = initializeApp(firebaseConfig);
-      const db = getDatabase(app);
-
-      // Функция для отправки брони в облако Firebase
-      window.makeBookingInFirebase = async function(bookingData) {
-        try {
-          // 1. Получаем текущие данные комнат из облака
-          const roomsRef = ref(db, 'rooms');
-          const snapshot = await get(roomsRef);
-          let roomsData = snapshot.val();
-
-          if (!roomsData) return false;
-
-          // 2. Ищем забронированную комнату и списываем свободные места
-          let roomFound = false;
-          for (let catKey in roomsData) {
-            let room = roomsData[catKey].rooms.find(r => r.id === bookingData.roomId);
-            if (room) {
-              if (room.free < bookingData.guestsCount) {
-                alert('К сожалению, не хватает свободных мест!');
-                return false;
-              }
-              room.free -= bookingData.guestsCount;
-              roomFound = true;
-              break;
-            }
-          }
-
-          if (!roomFound) return false;
-
-          // 3. Сохраняем обновленные свободные места в Firebase
-          await set(ref(db, 'rooms'), roomsData);
-
-          // 4. Добавляем новую запись бронирования в Firebase
-          const newBookingRef = push(ref(db, 'bookings'));
-          await set(newBookingRef, bookingData);
-
-          return true;
-        } catch (error) {
-          console.error("Ошибка при отправке в Firebase:", error);
-          alert("Ошибка подключения к серверу. Попробуйте ещё раз.");
-          return false;
-        }
-      };
-    </script>
 
 </body>
 </html>
