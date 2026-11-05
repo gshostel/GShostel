@@ -1278,11 +1278,25 @@
 
             .doc-notice-box { background: #fff8e7; border: 1px dashed #f39c12; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; font-size: 13px; color: #8a6d3b; text-align: left; }
             .doc-notice-title { font-weight: 700; margin-bottom: 4px; font-size: 13px; color: #d35400; display: flex; align-items: center; gap: 6px; }
+
+            @media (max-width: 600px) {
+                .community-box { margin: 8px; padding: 16px 12px; }
+                .booking-section-title { font-size: 21px; }
+                .rooms-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+                .room-header { gap: 8px; padding: 14px; }
+                .room-title { min-width: 0; font-size: 15px; }
+                .room-price { flex-shrink: 0; font-size: 12px; padding: 4px 8px; }
+                .room-body { padding: 12px; }
+                .subroom-item { gap: 8px; align-items: flex-start; }
+                .subroom-item > span:first-child { min-width: 0; flex: 1; }
+                .badge-free, .badge-full { flex-shrink: 0; }
+                .room-footer { padding: 12px; }
+            }
         </style>
 
         <div class="booking-section-header">
             <h2 class="booking-section-title">Выбор и бронирование номеров</h2>
-            <p class="booking-section-subtitle">По вопросам бронирования всех мест (для гостей любого пола) пишите в WhatsApp или звоните. Контакты и номер хостела указаны вверху на вкладке «Главная»</p>
+            <p class="booking-section-subtitle">Свободные места в режиме реального времени</p>
         </div>
 
         <!-- Панель даты и мест -->
@@ -1457,7 +1471,7 @@ const defaultHostelData = {
         price: 12000, 
         type: "room", 
         maxCapacity: 2,
-        img: "https://i.ibb.co.com/Cp5gVmMX/IMG-8397.png", 
+        img: "https://i.ibb.co/Cp5gVmMX/IMG-8397.png", 
         rooms: [{ id: "vip_1", name: "VIP номер", total: 1, free: 1 }] 
     },
     "family": { 
@@ -1465,7 +1479,7 @@ const defaultHostelData = {
         price: 18000, 
         type: "room", 
         maxCapacity: 4,
-        img: "https://i.ibb.co.com/LhCJ1Hds/photo-2026-10-09-17-25-06-2.jpg", 
+        img: "https://i.ibb.co/LhCJ1Hds/photo-2026-10-09-17-25-06-2.jpg", 
         rooms: [{ id: "fam_1", name: "Семейный номер", total: 1, free: 1 }] 
     },
     "male": { 
@@ -1473,7 +1487,7 @@ const defaultHostelData = {
         price: 6000, 
         type: "bed", 
         maxCapacity: 24,
-        img: "https://i.ibb.co.com/Xnyyncb/IMG-7745.avif",
+        img: "https://i.ibb.co/Xnyyncb/IMG-7745.avif",
         rooms: [
             { id: "m_1", name: "Комната №1 (8 мест)", total: 8, free: 8 },
             { id: "m_2", name: "Комната №2 (8 мест)", total: 8, free: 8 },
@@ -1485,7 +1499,7 @@ const defaultHostelData = {
         price: 6000, 
         type: "bed", 
         maxCapacity: 24,
-        img: "https://i.ibb.co.com/jks5cqDp/IMG-8401.png",
+        img: "https://i.ibb.co/jks5cqDp/IMG-8401.png",
         rooms: [
             { id: "f_1", name: "Комната №1 (14 мест)", total: 14, free: 14 },
             { id: "f_2", name: "Комната №2 (10 мест)", total: 10, free: 10 }
